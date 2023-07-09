@@ -1,0 +1,26 @@
+require:
+  - rubocop-rake
+
+AllCops:
+  TargetRubyVersion: 2.4
+  NewCops: enable
+
+Metrics/BlockLength:
+  Exclude:
+    - fluent-plugin-ssl-check.gemspec
+    - test/**/*.rb
+
+Metrics/ClassLength:
+  Exclude:
+    - test/**/*.rb
+
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/ParameterLists:
+  Exclude:
+    - test/helper.rb
+
+# Naming/MethodParameterName:
+#   Exclude:
+#     - lib/fluent/plugin/in_ssl_check.rb

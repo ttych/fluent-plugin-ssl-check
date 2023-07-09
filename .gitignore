@@ -1,0 +1,13 @@
+# tmp file
+/.bundle/
+/.yardoc
+/_yardoc/
+/coverage/
+/doc/
+/pkg/
+/spec/reports/
+/tmp/
+/.byebug_history
+
+# lib file
+# /Gemfile.lock
