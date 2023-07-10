@@ -17,6 +17,10 @@
 
 require 'fluent/plugin/input'
 
+require 'socket'
+require 'openssl'
+require 'timeout'
+
 module Fluent
   module Plugin
     # ssl_check input plugin
@@ -29,6 +33,7 @@ module Fluent
       DEFAULT_HOST = 'localhost'
       DEFAULT_PORT = 443
       DEFAULT_TIME = 600
+      DEFAULT_TIMEOUT = 5
 
       desc 'Tag to emit events on'
       config_param :tag, :string, default: DEFAULT_TAG
@@ -44,6 +49,9 @@ module Fluent
       desc 'CA file to load'
       config_param :ca_file, :string, default: nil
 
+      desc 'Timeout for check'
+      config_param :timeout, :integer, default: DEFAULT_TIMEOUT
+
       helpers :timer
 
       def configure(conf)
@@ -55,6 +63,12 @@ module Fluent
         raise Fluent::ConfigError, 'interval can not be < 1.' if !interval || interval < 1
         raise Fluent::ConfigError, 'ca_path should be a dir.' if ca_path && !File.directory?(ca_path)
         raise Fluent::ConfigError, 'ca_file should be a file.' if ca_file && !File.file?(ca_file)
+
+        @ssl_client = SslClient.new(
+          host: host, port: port,
+          ca_path: ca_path, ca_file: ca_file,
+          timeout: timeout
+        )
       end
 
       def start
@@ -64,45 +78,74 @@ module Fluent
       end
 
       def check
-        # require "socket"
-        # require "openssl"
+        ssl_info = @ssl_client.check
 
-        # cert_store = OpenSSL::X509::Store.new
-        # cert_store.set_default_paths
-        # # cert_store.add_file 'cacert.pem'
-        # cert_store.add_path '/etc/ssl/certs'
-        # # cert_store.add_file '/etc/ssl/certs/ca-certificates.crt'
-        # # cert_store.add_file '/etc/ssl/certs/GlobalSign_Root_CA.pem'
+        #         tag = "myapp.access"
+        # time = Fluent::Engine.now
+        # record = {"message"=>"body"}
+        # router.emit(tag, time, record)
 
-        # ssl_context = OpenSSL::SSL::SSLContext.new
-        # ssl_context.verify_mode = OpenSSL::SSL::VERIFY_PEER
-        # # ssl_context.verify_depth = 2
-        # ssl_context.cert_store = cert_store
-        # # ssl_context.min_version = nil
-        # ssl_context.min_version = OpenSSL::SSL::TLS1_1_VERSION
-        # # ssl_context.max_version = nil
-        # ssl_context.max_version = OpenSSL::SSL::TLS1_2_VERSION
-
-        # puts ssl_context.options.inspect
-
-        # tcp_socket = TCPSocket.open 'www.youtube.com', 443
-        # ssl_socket = OpenSSL::SSL::SSLSocket.new tcp_socket, ssl_context
-
-        # ssl_socket.connect
-
-        # cert = OpenSSL::X509::Certificate.new(ssl_socket.peer_cert)
-
-        # puts cert.inspect
-
-        # binding.irb
-
-        # puts cert_store.verify(cert, ssl_socket.peer_cert_chain)
-
-        # puts ssl_socket.ssl_version
+        # es = MultiEventStream.new
+        # records.each do |record|
+        #   es.add(time, record)
+        # end
+        # router.emit_stream(tag, es)
+      rescue StandardError
       end
 
-      def shutdown
-        super
+      # ssl client
+      #  to check ssl status
+      class SslClient
+        SslInfo = Struct.new(:cert, :cert_chain, :ssl_version)
+
+        attr_reader :host, :port, :ca_path, :ca_file, :timeout
+
+        def initialize(host:, port:, ca_path: nil, ca_file: nil, timeout: 5)
+          @host = host
+          @port = port
+          @ca_path = ca_path
+          @ca_file = ca_file
+          @timeout = timeout
+        end
+
+        def check
+          Timeout.timeout(timeout) do
+            tcp_socket = TCPSocket.open(host, port)
+            ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
+            ssl_socket.connect
+
+            # cert_store.verify(ssl_socket.peer_cert, ssl_socket.peer_cert_chain)
+
+            ssl_info = SslInfo.new(
+              OpenSSL::X509::Certificate.new(ssl_socket.peer_cert),
+              ssl_socket.peer_cert_chain,
+              ssl_socket.ssl_socket.ssl_version
+            )
+
+            ssl_socket.sysclose
+            tcp_socket.close
+
+            ssl_info
+          end
+        end
+
+        def store
+          @store ||= OpenSSL::X509::Store.new.tap do |store|
+            store.set_default_paths if !ca_path && !ca_file
+
+            cert_store.add_path(ca_path) if ca_path
+            cert_store.add_file(ca_file) if ca_file
+          end
+        end
+
+        def ssl_context
+          @ssl_context ||= OpenSSL::SSL::SSLContext.new.tap do |ssl_context|
+            ssl_context.verify_mode = OpenSSL::SSL::VERIFY_PEER
+            ssl_context.cert_store = store
+            ssl_context.min_version = nil
+            ssl_context.max_version = OpenSSL::SSL::TLS1_2_VERSION
+          end
+        end
       end
     end
   end

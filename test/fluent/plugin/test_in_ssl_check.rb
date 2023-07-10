@@ -21,6 +21,7 @@ class SslCheckInputTest < Test::Unit::TestCase
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TIME, input.interval
       assert_equal nil, input.ca_path
       assert_equal nil, input.ca_file
+      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TIMEOUT, input.timeout
     end
 
     test 'tag can not be empty' do
@@ -82,6 +83,27 @@ class SslCheckInputTest < Test::Unit::TestCase
         create_driver(conf)
       end
     end
+  end
+
+  # check
+  sub_test_case 'check' do
+    test 'abc' do
+      # d = create_driver
+      # d.run(expect_emits: 4, timeout: 10)
+    end
+    #     test 'test expects plugin emits events 4 times' do
+    #       d = create_driver
+    #
+    #       # This method blocks until the input plugin emits events 4 times
+    #       # or 10 seconds lapse.
+    #       d.run(expect_emits: 4, timeout: 10)
+    #
+    #       # An array of `[tag, time, record]`
+    #       events = d.events
+    #
+    #       assert_equal 'expected_tag', events[0][0]
+    #       # ...
+    #     end
   end
 
   private
