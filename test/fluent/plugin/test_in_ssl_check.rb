@@ -87,30 +87,85 @@ class SslCheckInputTest < Test::Unit::TestCase
 
   # check
   sub_test_case 'check' do
-    test 'abc' do
-      # d = create_driver
-      # d.run(expect_emits: 4, timeout: 10)
+    # test 'check non existing service' do
+    #   conf = %(
+    #     #{DEFAULT_CONF}
+    #     host 127.0.0.2
+    #     port 1272
+    #     interval 1
+    #   )
+    #   driver = create_driver(conf)
+    #   mock_driver_timer(driver)
+    #   # driver.run(expect_emits: 1, timeout: 5)
+    #   driver.instance.check
+
+    #   events = driver.events
+
+    #   assert_equal 1, events.size
+    #   assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events.first.first
+    #   assert_equal({"host" => "127.0.0.2",
+    #                  "name" => "ssl_status",
+    #                  "port" => 1272,
+    #                  "timestamp" => 1688680800000,
+    #                  "value" => 0}, events.first.last)
+    # end
+
+    test 'check with fake ssl_info' do
+      driver = create_driver
+      mock_driver_timer(driver)
+      mock_driver_ssl_info(driver)
+
+      # driver.run(expect_emits: 2, timeout: 5)
+      driver.instance.check
+
+      events = driver.events
+
+      assert_equal 2, events.size
+      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events[0].first
+      assert_equal({ 'host' => 'localhost',
+                     'name' => 'ssl_status',
+                     'port' => 443,
+                     'timestamp' => 1_688_680_800_000,
+                     'value' => 1,
+                     'ssl_dn' => '/CN=TEST',
+                     'ssl_version' => 'ssl_version' }, events[0].last)
+      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events[1].first
+      assert_equal({ 'host' => 'localhost',
+                     'name' => 'ssl_expirency',
+                     'port' => 443,
+                     'timestamp' => 1_688_680_800_000,
+                     'value' => 729,
+                     'ssl_dn' => '/CN=TEST',
+                     'ssl_version' => 'ssl_version' }, events[1].last)
     end
-    #     test 'test expects plugin emits events 4 times' do
-    #       d = create_driver
-    #
-    #       # This method blocks until the input plugin emits events 4 times
-    #       # or 10 seconds lapse.
-    #       d.run(expect_emits: 4, timeout: 10)
-    #
-    #       # An array of `[tag, time, record]`
-    #       events = d.events
-    #
-    #       assert_equal 'expected_tag', events[0][0]
-    #       # ...
-    #     end
   end
 
   private
 
   DEFAULT_CONF = %()
-
+  MOCKED_TIME = Time.parse('2023-07-07')
   def create_driver(conf = DEFAULT_CONF)
     Fluent::Test::Driver::Input.new(Fluent::Plugin::SslCheckInput).configure(conf)
+  end
+
+  def mock_driver_timer(driver)
+    driver.instance.define_singleton_method :now do
+      Fluent::EventTime.from_time(MOCKED_TIME)
+    end
+  end
+
+  def mock_driver_ssl_info(driver)
+    driver.instance.define_singleton_method :fetch_ssl_info do
+      certificate = OpenSSL::X509::Certificate.new.tap do |cert|
+        cert.subject = OpenSSL::X509::Name.parse '/CN=TEST'
+        cert.not_after = MOCKED_TIME + 2 * 365 * 24 * 60 * 60  # 2 years
+      end
+
+      Fluent::Plugin::SslCheckInput::SslInfo.new(
+        certificate,
+        nil,
+        'ssl_version'
+      )
+    end
   end
 end

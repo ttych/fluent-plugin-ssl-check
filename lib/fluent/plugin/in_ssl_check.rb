@@ -20,6 +20,9 @@ require 'fluent/plugin/input'
 require 'socket'
 require 'openssl'
 require 'timeout'
+require 'date'
+
+require_relative 'extensions/time'
 
 module Fluent
   module Plugin
@@ -54,6 +57,7 @@ module Fluent
 
       helpers :timer
 
+      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def configure(conf)
         super
 
@@ -70,6 +74,7 @@ module Fluent
           timeout: timeout
         )
       end
+      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def start
         super
@@ -78,26 +83,75 @@ module Fluent
       end
 
       def check
-        ssl_info = @ssl_client.check
+        time = now
 
-        #         tag = "myapp.access"
-        # time = Fluent::Engine.now
-        # record = {"message"=>"body"}
-        # router.emit(tag, time, record)
-
-        # es = MultiEventStream.new
-        # records.each do |record|
-        #   es.add(time, record)
-        # end
-        # router.emit_stream(tag, es)
+        ssl_info = fetch_ssl_info
+        router.emit(tag, time, event_status(time, ssl_info))
+        router.emit(tag, time, event_expirency(time, ssl_info))
       rescue StandardError
+        router.emit(tag, time, event_status_failure(time))
+      end
+
+      def fetch_ssl_info
+        @ssl_client.ssl_info
+      end
+
+      def event_status(time, ssl_info)
+        {
+          'timestamp' => time.to_epochmillis,
+          'name' => 'ssl_status',
+          'value' => 1,
+          'host' => host,
+          'port' => port,
+          'ssl_version' => ssl_info.ssl_version,
+          'ssl_dn' => ssl_info.subject_s
+        }
+      end
+
+      def event_status_failure(time)
+        {
+          'timestamp' => time.to_epochmillis,
+          'name' => 'ssl_status',
+          'value' => 0,
+          'host' => host,
+          'port' => port
+        }
+      end
+
+      def event_expirency(time, ssl_info)
+        {
+          'timestamp' => time.to_epochmillis,
+          'name' => 'ssl_expirency',
+          'value' => ssl_info.expire_in_day(time),
+          'host' => host,
+          'port' => port,
+          'ssl_version' => ssl_info.ssl_version,
+          'ssl_dn' => ssl_info.subject_s
+        }
+      end
+
+      def now
+        Fluent::Engine.now
+      end
+
+      # ssl info
+      #  to encapsulate extracted ssl information
+      SslInfo = Struct.new(:cert, :cert_chain, :ssl_version) do
+        def subject_s
+          cert.subject.to_s
+        end
+
+        def expire_in_day(from = Date.today)
+          from = from.to_time.to_date
+          expire_in = cert.not_after.to_date
+
+          (expire_in - from).to_i
+        end
       end
 
       # ssl client
       #  to check ssl status
       class SslClient
-        SslInfo = Struct.new(:cert, :cert_chain, :ssl_version)
-
         attr_reader :host, :port, :ca_path, :ca_file, :timeout
 
         def initialize(host:, port:, ca_path: nil, ca_file: nil, timeout: 5)
@@ -108,7 +162,7 @@ module Fluent
           @timeout = timeout
         end
 
-        def check
+        def ssl_info
           Timeout.timeout(timeout) do
             tcp_socket = TCPSocket.open(host, port)
             ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
@@ -130,7 +184,7 @@ module Fluent
         end
 
         def store
-          @store ||= OpenSSL::X509::Store.new.tap do |store|
+          OpenSSL::X509::Store.new.tap do |store|
             store.set_default_paths if !ca_path && !ca_file
 
             cert_store.add_path(ca_path) if ca_path
@@ -139,7 +193,7 @@ module Fluent
         end
 
         def ssl_context
-          @ssl_context ||= OpenSSL::SSL::SSLContext.new.tap do |ssl_context|
+          OpenSSL::SSL::SSLContext.new.tap do |ssl_context|
             ssl_context.verify_mode = OpenSSL::SSL::VERIFY_PEER
             ssl_context.cert_store = store
             ssl_context.min_version = nil
