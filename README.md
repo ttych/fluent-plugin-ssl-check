@@ -13,7 +13,7 @@ Example:
 ``` conf
 <source>
   @type ssl_check
-  tag ssh_check
+  tag ssl_check
 
   host my-service.com
   port 443

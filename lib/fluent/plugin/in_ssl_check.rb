@@ -37,6 +37,9 @@ module Fluent
       DEFAULT_PORT = 443
       DEFAULT_TIME = 600
       DEFAULT_TIMEOUT = 5
+      DEFAULT_LOG_EVENTS = true
+      DEFAULT_METRIC_EVENTS = false
+      DEFAULT_EVENT_PREFIX = ''
 
       desc 'Tag to emit events on'
       config_param :tag, :string, default: DEFAULT_TAG
@@ -54,6 +57,15 @@ module Fluent
 
       desc 'Timeout for check'
       config_param :timeout, :integer, default: DEFAULT_TIMEOUT
+
+      desc 'Emit log events'
+      config_param :log_events, :bool, default: DEFAULT_LOG_EVENTS
+      desc 'Emit metric events'
+      config_param :metric_events, :bool, default: DEFAULT_METRIC_EVENTS
+      desc 'Event prefix'
+      config_param :event_prefix, :string, default: DEFAULT_EVENT_PREFIX
+      desc 'Timestamp format'
+      config_param :timestamp_format, :enum, list: %i[iso epochmillis], default: :iso
 
       helpers :timer
 
@@ -83,69 +95,103 @@ module Fluent
       end
 
       def check
-        time = now
-
         ssl_info = fetch_ssl_info
-        router.emit(tag, time, event_status(time, ssl_info))
-        router.emit(tag, time, event_expirency(time, ssl_info))
-      rescue StandardError
-        router.emit(tag, time, event_status_failure(time))
+
+        emit_logs(ssl_info) if log_events
+        emit_metrics(ssl_info) if metric_events
       end
 
       def fetch_ssl_info
         @ssl_client.ssl_info
       end
 
-      def event_status(time, ssl_info)
-        {
-          'timestamp' => time.to_epochmillis,
-          'name' => 'ssl_status',
-          'value' => 1,
+      def emit_logs(ssl_info)
+        record = {
+          'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
+          'status' => ssl_info.status,
           'host' => host,
           'port' => port,
           'ssl_version' => ssl_info.ssl_version,
-          'ssl_dn' => ssl_info.subject_s
+          'ssl_dn' => ssl_info.subject_s,
+          'ssl_not_after' => ssl_info.not_after,
+          'expire_in_days' => ssl_info.expire_in_days
         }
+        router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
 
-      def event_status_failure(time)
-        {
-          'timestamp' => time.to_epochmillis,
-          'name' => 'ssl_status',
-          'value' => 0,
-          'host' => host,
-          'port' => port
-        }
+      def emit_metrics(ssl_info)
+        emit_metric_status(ssl_info)
+        emit_metric_expirency(ssl_info)
       end
 
-      def event_expirency(time, ssl_info)
-        {
-          'timestamp' => time.to_epochmillis,
-          'name' => 'ssl_expirency',
-          'value' => ssl_info.expire_in_day(time),
-          'host' => host,
-          'port' => port,
-          'ssl_version' => ssl_info.ssl_version,
-          'ssl_dn' => ssl_info.subject_s
+      # rubocop:disable Metrics/AbcSize
+      def emit_metric_status(ssl_info)
+        record = {
+          'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
+          'metric_name' => 'ssl_status',
+          'metric_value' => ssl_info.status,
+          "#{event_prefix}host" => host,
+          "#{event_prefix}port" => port,
+          "#{event_prefix}ssl_dn" => ssl_info.subject_s,
+          "#{event_prefix}ssl_version" => ssl_info.ssl_version,
+          "#{event_prefix}ssl_not_after" => ssl_info.not_after
         }
+        router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
+      # rubocop:enable Metrics/AbcSize
 
-      def now
-        Fluent::Engine.now
+      def emit_metric_expirency(ssl_info)
+        return if ssl_info.error
+
+        record = {
+          'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
+          'metric_name' => 'ssl_expirency',
+          'metric_value' => ssl_info.expire_in_days,
+          "#{event_prefix}host" => host,
+          "#{event_prefix}port" => port,
+          "#{event_prefix}ssl_dn" => ssl_info.subject_s
+        }
+        router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
 
       # ssl info
       #  to encapsulate extracted ssl information
-      SslInfo = Struct.new(:cert, :cert_chain, :ssl_version) do
-        def subject_s
-          cert.subject.to_s
+      class SslInfo
+        OK = 1
+        KO = 0
+
+        attr_reader :time
+        attr_accessor :cert, :cert_chain, :ssl_version, :error
+
+        def initialize(cert: nil, cert_chain: nil, ssl_version: nil, error: nil, time: Time.now)
+          @cert = cert
+          @cert_chain = cert_chain
+          @ssl_version = ssl_version
+          @error = error
+          @time = time
         end
 
-        def expire_in_day(from = Date.today)
-          from = from.to_time.to_date
-          expire_in = cert.not_after.to_date
+        def subject_s
+          cert.subject.to_s if cert&.subject
+        end
 
-          (expire_in - from).to_i
+        def expire_in_days
+          return unless cert&.not_after
+
+          expire_in = cert.not_after
+          ((expire_in - time) / 3600 / 24).to_i
+        end
+
+        def not_after
+          return unless cert
+
+          cert.not_after.iso8601(3)
+        end
+
+        def status
+          return KO if error
+
+          OK
         end
       end
 
@@ -162,33 +208,34 @@ module Fluent
           @timeout = timeout
         end
 
+        # rubocop:disable Metrics/AbcSize
         def ssl_info
-          Timeout.timeout(timeout) do
-            tcp_socket = TCPSocket.open(host, port)
-            ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
-            ssl_socket.connect
+          info = SslInfo.new
+          begin
+            Timeout.timeout(timeout) do
+              tcp_socket = TCPSocket.open(host, port)
+              ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
+              ssl_socket.connect
+              ssl_socket.sysclose
+              tcp_socket.close
 
-            # cert_store.verify(ssl_socket.peer_cert, ssl_socket.peer_cert_chain)
-
-            ssl_info = SslInfo.new(
-              OpenSSL::X509::Certificate.new(ssl_socket.peer_cert),
-              ssl_socket.peer_cert_chain,
-              ssl_socket.ssl_socket.ssl_version
-            )
-
-            ssl_socket.sysclose
-            tcp_socket.close
-
-            ssl_info
+              # cert_store.verify(ssl_socket.peer_cert, ssl_socket.peer_cert_chain)
+              info.cert = ssl_socket.peer_cert
+              info.cert_chain = ssl_socket.peer_cert_chain
+              info.ssl_version = ssl_socket.ssl_version
+            end
+          rescue StandardError => e
+            info.error = e.to_s
           end
+          info
         end
+        # rubocop:enable Metrics/AbcSize
 
         def store
           OpenSSL::X509::Store.new.tap do |store|
-            store.set_default_paths if !ca_path && !ca_file
-
-            cert_store.add_path(ca_path) if ca_path
-            cert_store.add_file(ca_file) if ca_file
+            store.set_default_paths
+            store.add_path(ca_path) if ca_path
+            store.add_file(ca_file) if ca_file
           end
         end
 

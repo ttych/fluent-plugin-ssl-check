@@ -2,8 +2,11 @@ require:
   - rubocop-rake
 
 AllCops:
-  TargetRubyVersion: 2.4
+  TargetRubyVersion: 2.7
   NewCops: enable
+
+Gemspec/DevelopmentDependencies:
+  Enabled: false
 
 Metrics/BlockLength:
   Exclude:
@@ -13,6 +16,7 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Exclude:
     - test/**/*.rb
+    - lib/fluent/plugin/in_ssl_check.rb
 
 Metrics/MethodLength:
   Max: 20

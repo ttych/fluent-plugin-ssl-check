@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
-module Fluent
-  # extension
-  class EventTime
-    def to_epochmillis
-      @sec * 1_000 + @nsec / 1_000_000
-    end
+
+class Time
+  def to_epochmillis
+    (to_f * 1000).to_i
+  end
+
+  def to_iso
+    iso8601(3)
   end
 end
