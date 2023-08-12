@@ -5,7 +5,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name    = 'fluent-plugin-ssl-check'
-  spec.version = '1.0.0'
+  spec.version = '1.1.0'
   spec.authors = ['Thomas Tych']
   spec.email   = ['thomas.tych@gmail.com']
 

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    fluent-plugin-ssl-check (1.0.0)
+    fluent-plugin-ssl-check (1.1.0)
       fluentd (>= 0.14.10, < 2)
 
 GEM
