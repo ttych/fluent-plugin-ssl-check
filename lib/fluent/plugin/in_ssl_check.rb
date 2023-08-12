@@ -69,7 +69,7 @@ module Fluent
 
       helpers :timer
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def configure(conf)
         super
 
@@ -86,7 +86,7 @@ module Fluent
           timeout: timeout
         )
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def start
         super
@@ -116,6 +116,7 @@ module Fluent
           'ssl_not_after' => ssl_info.not_after,
           'expire_in_days' => ssl_info.expire_in_days
         }
+        record.update('error_class' => ssl_info.error_class) if ssl_info.error_class
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
 
@@ -124,7 +125,6 @@ module Fluent
         emit_metric_expirency(ssl_info)
       end
 
-      # rubocop:disable Metrics/AbcSize
       def emit_metric_status(ssl_info)
         record = {
           'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
@@ -138,7 +138,6 @@ module Fluent
         }
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
-      # rubocop:enable Metrics/AbcSize
 
       def emit_metric_expirency(ssl_info)
         return if ssl_info.error
@@ -193,6 +192,12 @@ module Fluent
 
           OK
         end
+
+        def error_class
+          return unless error
+
+          error.class.to_s
+        end
       end
 
       # ssl client
@@ -208,7 +213,6 @@ module Fluent
           @timeout = timeout
         end
 
-        # rubocop:disable Metrics/AbcSize
         def ssl_info
           info = SslInfo.new
           begin
@@ -225,11 +229,10 @@ module Fluent
               info.ssl_version = ssl_socket.ssl_version
             end
           rescue StandardError => e
-            info.error = e.to_s
+            info.error = e
           end
           info
         end
-        # rubocop:enable Metrics/AbcSize
 
         def store
           OpenSSL::X509::Store.new.tap do |store|

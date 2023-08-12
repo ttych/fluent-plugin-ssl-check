@@ -113,7 +113,8 @@ class SslCheckInputTest < Test::Unit::TestCase
                      'ssl_version' => nil,
                      'ssl_dn' => nil,
                      'ssl_not_after' => nil,
-                     'expire_in_days' => nil },
+                     'expire_in_days' => nil,
+                     'error_class' => 'Errno::ECONNREFUSED' },
                    events.first.last)
     end
 
