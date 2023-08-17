@@ -45,9 +45,7 @@ module Fluent
       config_param :tag, :string, default: DEFAULT_TAG
 
       desc 'Host of the service to check'
-      config_param :host, :string, default: DEFAULT_HOST
-      desc 'Port of the service to check'
-      config_param :port, :integer, default: DEFAULT_PORT
+      config_param :hosts, :array, default: [], value_type: :string
       desc 'Interval for the check execution'
       config_param :interval, :time, default: DEFAULT_TIME
       desc 'CA path to load'
@@ -74,17 +72,10 @@ module Fluent
         super
 
         raise Fluent::ConfigError, 'tag can not be empty.' if !tag || tag.empty?
-        raise Fluent::ConfigError, 'host can not be empty.' if !host || host.empty?
-        raise Fluent::ConfigError, 'port can not be < 1' if !port || port < 1
+        raise Fluent::ConfigError, 'hosts can not be empty.' if !hosts || hosts.empty?
         raise Fluent::ConfigError, 'interval can not be < 1.' if !interval || interval < 1
         raise Fluent::ConfigError, 'ca_path should be a dir.' if ca_path && !File.directory?(ca_path)
         raise Fluent::ConfigError, 'ca_file should be a file.' if ca_file && !File.file?(ca_file)
-
-        @ssl_client = SslClient.new(
-          host: host, port: port,
-          ca_path: ca_path, ca_file: ca_file,
-          timeout: timeout
-        )
       end
       # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
@@ -94,23 +85,34 @@ module Fluent
         timer_execute(:ssl_check_timer, interval, repeat: true, &method(:check))
       end
 
+      # rubocop:disable Lint/SuppressedException
       def check
-        ssl_info = fetch_ssl_info
-
-        emit_logs(ssl_info) if log_events
-        emit_metrics(ssl_info) if metric_events
+        hosts.each do |host_full|
+          host, port = host_full.split(':')
+          port = (port || DEFAULT_PORT).to_i
+          ssl_info = fetch_ssl_info(host, port)
+          emit_logs(ssl_info) if log_events
+          emit_metrics(ssl_info) if metric_events
+        rescue StandardError
+        end
       end
+      # rubocop:enable Lint/SuppressedException
 
-      def fetch_ssl_info
-        @ssl_client.ssl_info
+      def fetch_ssl_info(host, port)
+        ssl_client = SslClient.new(
+          host: host, port: port,
+          ca_path: ca_path, ca_file: ca_file,
+          timeout: timeout
+        )
+        ssl_client.ssl_info
       end
 
       def emit_logs(ssl_info)
         record = {
           'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
           'status' => ssl_info.status,
-          'host' => host,
-          'port' => port,
+          'host' => ssl_info.host,
+          'port' => ssl_info.port,
           'ssl_version' => ssl_info.ssl_version,
           'ssl_dn' => ssl_info.subject_s,
           'ssl_not_after' => ssl_info.not_after,
@@ -130,8 +132,8 @@ module Fluent
           'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
           'metric_name' => 'ssl_status',
           'metric_value' => ssl_info.status,
-          "#{event_prefix}host" => host,
-          "#{event_prefix}port" => port,
+          "#{event_prefix}host" => ssl_info.host,
+          "#{event_prefix}port" => ssl_info.port,
           "#{event_prefix}ssl_dn" => ssl_info.subject_s,
           "#{event_prefix}ssl_version" => ssl_info.ssl_version,
           "#{event_prefix}ssl_not_after" => ssl_info.not_after
@@ -146,8 +148,8 @@ module Fluent
           'timestamp' => ssl_info.time.send("to_#{timestamp_format}"),
           'metric_name' => 'ssl_expirency',
           'metric_value' => ssl_info.expire_in_days,
-          "#{event_prefix}host" => host,
-          "#{event_prefix}port" => port,
+          "#{event_prefix}host" => ssl_info.host,
+          "#{event_prefix}port" => ssl_info.port,
           "#{event_prefix}ssl_dn" => ssl_info.subject_s
         }
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
@@ -160,15 +162,19 @@ module Fluent
         KO = 0
 
         attr_reader :time
-        attr_accessor :cert, :cert_chain, :ssl_version, :error
+        attr_accessor :host, :port, :cert, :cert_chain, :ssl_version, :error
 
-        def initialize(cert: nil, cert_chain: nil, ssl_version: nil, error: nil, time: Time.now)
+        # rubocop:disable Metrics/ParameterLists
+        def initialize(host: nil, port: nil, cert: nil, cert_chain: nil, ssl_version: nil, error: nil, time: Time.now)
+          @host = host
+          @port = port
           @cert = cert
           @cert_chain = cert_chain
           @ssl_version = ssl_version
           @error = error
           @time = time
         end
+        # rubocop:enable Metrics/ParameterLists
 
         def subject_s
           cert.subject.to_s if cert&.subject
@@ -214,7 +220,7 @@ module Fluent
         end
 
         def ssl_info
-          info = SslInfo.new
+          info = SslInfo.new(host: host, port: port)
           begin
             Timeout.timeout(timeout) do
               tcp_socket = TCPSocket.open(host, port)

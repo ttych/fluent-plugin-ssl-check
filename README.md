@@ -15,8 +15,7 @@ Example:
   @type ssl_check
   tag ssl_check
 
-  host my-service.com
-  port 443
+  hosts my-service.com:4443
 
   interval 600
 
@@ -27,12 +26,12 @@ Example:
 
 Options are:
 * tag: Tag to emit events on
-* host: host of the service to check
-* port: port of the service to check
+* hosts: list of <host>:<port> to check
 * interval: check every X seconds
 * ca_path: directory that contains CA files
 * ca_file: specify a CA file directly
 
+If no port is specified with host, default port is 443.
 
 ## Installation
 
@@ -48,8 +47,8 @@ Add to Gemfile with:
 ## Compatibility
 
 plugin in 1.x.x will work with:
-- ruby >= 2.4.10
-- td-agent >= 3.8.1-0
+- ruby >= 2.7.7
+- td-agent >= 4.0.0
 
 
 ## Copyright
