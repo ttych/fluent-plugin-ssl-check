@@ -30,6 +30,11 @@ Options are:
 * interval: check every X seconds
 * ca_path: directory that contains CA files
 * ca_file: specify a CA file directly
+* timeout: timeout for ssl check execution (5sec)
+* log_events: emit log format (true)
+* metric_events: emit metric format (false)
+* event_prefix: metric event prefix for extra dimension
+* timestamp_format: iso, epochmillis timestamp format (iso)
 
 If no port is specified with host, default port is 443.
 
