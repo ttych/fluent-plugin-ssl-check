@@ -82,6 +82,8 @@ module Fluent
       def start
         super
 
+        timer_execute(:ssl_check_timer, 1, repeat: false, &method(:check)) if interval > 60
+
         timer_execute(:ssl_check_timer, interval, repeat: true, &method(:check))
       end
 
