@@ -16,7 +16,7 @@ class SslCheckInputTest < Test::Unit::TestCase
       input = driver.instance
 
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, input.tag
-      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TIME, input.interval
+      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_INTERVAL, input.interval
       assert_equal nil, input.ca_path
       assert_equal nil, input.ca_file
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TIMEOUT, input.timeout

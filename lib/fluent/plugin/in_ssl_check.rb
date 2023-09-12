@@ -35,7 +35,7 @@ module Fluent
       DEFAULT_TAG = NAME
       DEFAULT_HOST = 'localhost'
       DEFAULT_PORT = 443
-      DEFAULT_TIME = 600
+      DEFAULT_INTERVAL = 600
       DEFAULT_TIMEOUT = 5
       DEFAULT_LOG_EVENTS = true
       DEFAULT_METRIC_EVENTS = false
@@ -47,7 +47,7 @@ module Fluent
       desc 'Host of the service to check'
       config_param :hosts, :array, default: [], value_type: :string
       desc 'Interval for the check execution'
-      config_param :interval, :time, default: DEFAULT_TIME
+      config_param :interval, :time, default: DEFAULT_INTERVAL
       desc 'CA path to load'
       config_param :ca_path, :string, default: nil
       desc 'CA file to load'
