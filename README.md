@@ -30,6 +30,7 @@ Options are:
 * interval: check every X seconds
 * ca_path: directory that contains CA files
 * ca_file: specify a CA file directly
+* sni: want the sni support (true)
 * timeout: timeout for ssl check execution (5sec)
 * log_events: emit log format (true)
 * metric_events: emit metric format (false)
