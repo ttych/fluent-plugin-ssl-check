@@ -19,6 +19,7 @@ class SslCheckInputTest < Test::Unit::TestCase
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_INTERVAL, input.interval
       assert_equal nil, input.ca_path
       assert_equal nil, input.ca_file
+      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_SNI, input.sni
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TIMEOUT, input.timeout
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_LOG_EVENTS, input.log_events
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_METRIC_EVENTS, input.metric_events

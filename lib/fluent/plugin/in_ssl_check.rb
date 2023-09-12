@@ -36,6 +36,7 @@ module Fluent
       DEFAULT_HOST = 'localhost'
       DEFAULT_PORT = 443
       DEFAULT_INTERVAL = 600
+      DEFAULT_SNI = true
       DEFAULT_TIMEOUT = 5
       DEFAULT_LOG_EVENTS = true
       DEFAULT_METRIC_EVENTS = false
@@ -52,6 +53,8 @@ module Fluent
       config_param :ca_path, :string, default: nil
       desc 'CA file to load'
       config_param :ca_file, :string, default: nil
+      desc 'SNI support'
+      config_param :sni, :bool, default: DEFAULT_SNI
 
       desc 'Timeout for check'
       config_param :timeout, :integer, default: DEFAULT_TIMEOUT
@@ -104,7 +107,7 @@ module Fluent
         ssl_client = SslClient.new(
           host: host, port: port,
           ca_path: ca_path, ca_file: ca_file,
-          timeout: timeout
+          sni: sni, timeout: timeout
         )
         ssl_client.ssl_info
       end
@@ -211,13 +214,14 @@ module Fluent
       # ssl client
       #  to check ssl status
       class SslClient
-        attr_reader :host, :port, :ca_path, :ca_file, :timeout
+        attr_reader :host, :port, :ca_path, :ca_file, :sni, :timeout
 
-        def initialize(host:, port:, ca_path: nil, ca_file: nil, timeout: 5)
+        def initialize(host:, port:, ca_path: nil, ca_file: nil, sni: true, timeout: 5)
           @host = host
           @port = port
           @ca_path = ca_path
           @ca_file = ca_file
+          @sni = sni
           @timeout = timeout
         end
 
@@ -227,6 +231,7 @@ module Fluent
             Timeout.timeout(timeout) do
               tcp_socket = TCPSocket.open(host, port)
               ssl_socket = OpenSSL::SSL::SSLSocket.new(tcp_socket, ssl_context)
+              ssl_socket.hostname = host if sni
               ssl_socket.connect
               ssl_socket.sysclose
               tcp_socket.close

@@ -27,8 +27,7 @@ Metrics/MethodLength:
   Max: 20
 
 Metrics/ParameterLists:
-  Exclude:
-    - test/helper.rb
+  Max: 6
 
 # Naming/MethodParameterName:
 #   Exclude:
