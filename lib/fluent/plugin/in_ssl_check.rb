@@ -33,7 +33,6 @@ module Fluent
       Fluent::Plugin.register_input(NAME, self)
 
       DEFAULT_TAG = NAME
-      DEFAULT_HOST = 'localhost'
       DEFAULT_PORT = 443
       DEFAULT_INTERVAL = 600
       DEFAULT_SNI = true
@@ -75,10 +74,12 @@ module Fluent
         super
 
         raise Fluent::ConfigError, 'tag can not be empty.' if !tag || tag.empty?
-        raise Fluent::ConfigError, 'hosts can not be empty.' if !hosts || hosts.empty?
+        raise Fluent::ConfigError, 'hosts can not be empty.' unless hosts
         raise Fluent::ConfigError, 'interval can not be < 1.' if !interval || interval < 1
         raise Fluent::ConfigError, 'ca_path should be a dir.' if ca_path && !File.directory?(ca_path)
         raise Fluent::ConfigError, 'ca_file should be a file.' if ca_file && !File.file?(ca_file)
+
+        log.warn("#{NAME}: hosts is empty, nothing to process") if hosts.empty?
       end
       # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 

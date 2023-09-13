@@ -36,12 +36,21 @@ class SslCheckInputTest < Test::Unit::TestCase
       end
     end
 
-    test 'hosts can not be empty' do
+    test 'hosts can be empty' do
       conf = %(
       )
-      assert_raise(Fluent::ConfigError) do
-        create_driver(conf)
-      end
+      driver = create_driver(conf)
+      input = driver.instance
+
+      assert_equal [], input.hosts
+    end
+
+    test 'it generates warn log for empty hosts' do
+      conf = %()
+      driver = create_driver(conf)
+
+      host_empty_logs = driver.logs.detect { |log| log.match?(/hosts is empty/) }
+      assert host_empty_logs
     end
 
     test 'interval can not be < 1' do
