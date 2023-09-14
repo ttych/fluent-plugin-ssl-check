@@ -26,9 +26,6 @@ Metrics/ClassLength:
 Metrics/MethodLength:
   Max: 20
 
-Metrics/ParameterLists:
-  Max: 6
-
 # Naming/MethodParameterName:
 #   Exclude:
 #     - lib/fluent/plugin/in_ssl_check.rb

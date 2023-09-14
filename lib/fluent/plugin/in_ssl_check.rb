@@ -36,6 +36,7 @@ module Fluent
       DEFAULT_PORT = 443
       DEFAULT_INTERVAL = 600
       DEFAULT_SNI = true
+      DEFAULT_VERIFY_MODE = :peer
       DEFAULT_TIMEOUT = 5
       DEFAULT_LOG_EVENTS = true
       DEFAULT_METRIC_EVENTS = false
@@ -54,6 +55,12 @@ module Fluent
       config_param :ca_file, :string, default: nil
       desc 'SNI support'
       config_param :sni, :bool, default: DEFAULT_SNI
+      desc 'Verify mode'
+      config_param :verify_mode, :enum, list: %i[none peer], default: DEFAULT_VERIFY_MODE
+      desc 'Client Cert'
+      config_param :cert, :string, default: nil
+      desc 'Client Key'
+      config_param :key, :string, default: nil
 
       desc 'Timeout for check'
       config_param :timeout, :integer, default: DEFAULT_TIMEOUT
@@ -69,7 +76,7 @@ module Fluent
 
       helpers :timer
 
-      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/AbcSize, Style/DoubleNegation
       def configure(conf)
         super
 
@@ -78,10 +85,13 @@ module Fluent
         raise Fluent::ConfigError, 'interval can not be < 1.' if !interval || interval < 1
         raise Fluent::ConfigError, 'ca_path should be a dir.' if ca_path && !File.directory?(ca_path)
         raise Fluent::ConfigError, 'ca_file should be a file.' if ca_file && !File.file?(ca_file)
+        raise Fluent::ConfigError, 'cert should be a file.' if cert && !File.file?(cert)
+        raise Fluent::ConfigError, 'key should be a file.' if key && !File.file?(key)
+        raise Fluent::ConfigError, 'cert and key should be specified.' if !!cert ^ !!key
 
         log.warn("#{NAME}: hosts is empty, nothing to process") if hosts.empty?
       end
-      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity, Metrics/AbcSize, Style/DoubleNegation
 
       def start
         super
@@ -108,7 +118,9 @@ module Fluent
         ssl_client = SslClient.new(
           host: host, port: port,
           ca_path: ca_path, ca_file: ca_file,
-          sni: sni, timeout: timeout
+          sni: sni, verify_mode: ssl_verify_mode,
+          cert: cert, key: key,
+          timeout: timeout
         )
         ssl_client.ssl_info
       end
@@ -159,6 +171,14 @@ module Fluent
           "#{event_prefix}ssl_dn" => ssl_info.subject_s
         }
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
+      end
+
+      private
+
+      def ssl_verify_mode
+        return OpenSSL::SSL::VERIFY_PEER if verify_mode == :peer
+
+        OpenSSL::SSL::VERIFY_NONE
       end
 
       # ssl info
@@ -215,16 +235,23 @@ module Fluent
       # ssl client
       #  to check ssl status
       class SslClient
-        attr_reader :host, :port, :ca_path, :ca_file, :sni, :timeout
+        attr_reader :host, :port, :ca_path, :ca_file, :sni, :verify_mode, :cert, :key, :timeout
 
-        def initialize(host:, port:, ca_path: nil, ca_file: nil, sni: true, timeout: 5)
+        # rubocop:disable Metrics/ParameterLists
+        def initialize(host:, port:, ca_path: nil, ca_file: nil, sni: true, verify_mode: OpenSSL::SSL::VERIFY_PEER,
+                       cert: nil, key: nil,
+                       timeout: 5)
           @host = host
           @port = port
           @ca_path = ca_path
           @ca_file = ca_file
           @sni = sni
+          @verify_mode = verify_mode
+          @cert = cert
+          @key = key
           @timeout = timeout
         end
+        # rubocop:enable Metrics/ParameterLists
 
         def ssl_info
           info = SslInfo.new(host: host, port: port)
@@ -258,10 +285,12 @@ module Fluent
 
         def ssl_context
           OpenSSL::SSL::SSLContext.new.tap do |ssl_context|
-            ssl_context.verify_mode = OpenSSL::SSL::VERIFY_PEER
+            ssl_context.verify_mode = verify_mode
             ssl_context.cert_store = store
             ssl_context.min_version = nil
             ssl_context.max_version = OpenSSL::SSL::TLS1_2_VERSION
+            ssl_context.cert = OpenSSL::X509::Certificate.new(File.open(cert)) if cert
+            ssl_context.key = OpenSSL::PKey::RSA.new(File.open(key)) if key
           end
         end
       end

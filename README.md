@@ -31,6 +31,9 @@ Options are:
 * ca_path: directory that contains CA files
 * ca_file: specify a CA file directly
 * sni: want the sni support (true)
+* verify_mode: none or peer
+* cert: client cert for ssl connection
+* key: client key associated to client cert for ssl connection
 * timeout: timeout for ssl check execution (5sec)
 * log_events: emit log format (true)
 * metric_events: emit metric format (false)

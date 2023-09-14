@@ -19,7 +19,10 @@ class SslCheckInputTest < Test::Unit::TestCase
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_INTERVAL, input.interval
       assert_equal nil, input.ca_path
       assert_equal nil, input.ca_file
+      assert_equal nil, input.cert
+      assert_equal nil, input.key
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_SNI, input.sni
+      assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_VERIFY_MODE, input.verify_mode
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TIMEOUT, input.timeout
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_LOG_EVENTS, input.log_events
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_METRIC_EVENTS, input.metric_events
@@ -77,6 +80,56 @@ class SslCheckInputTest < Test::Unit::TestCase
       conf = %(
         #{DEFAULT_CONF}
         ca_file /nonexistent/file
+      )
+      assert_raise(Fluent::ConfigError) do
+        create_driver(conf)
+      end
+    end
+
+    test 'cert should be a valid file' do
+      conf = %(
+        #{DEFAULT_CONF}
+        cert /nonexistent/file
+      )
+      assert_raise(Fluent::ConfigError) do
+        create_driver(conf)
+      end
+    end
+
+    test 'key should be a valid file' do
+      conf = %(
+        #{DEFAULT_CONF}
+        key /nonexistent/file
+      )
+      assert_raise(Fluent::ConfigError) do
+        create_driver(conf)
+      end
+    end
+
+    test 'when cert is specified, key should be specified also' do
+      conf = %(
+        #{DEFAULT_CONF}
+        cert #{test_data_path('cert.pem')}
+      )
+      assert_raise(Fluent::ConfigError) do
+        create_driver(conf)
+      end
+    end
+
+    test 'when key is specified, cert should be specified also' do
+      conf = %(
+        #{DEFAULT_CONF}
+        key #{test_data_path('key.pem')}
+      )
+      assert_raise(Fluent::ConfigError) do
+        create_driver(conf)
+      end
+    end
+
+    test 'verify mode should not be outside configured enum values' do
+      conf = %(
+        #{DEFAULT_CONF}
+        verify_mode test
       )
       assert_raise(Fluent::ConfigError) do
         create_driver(conf)
