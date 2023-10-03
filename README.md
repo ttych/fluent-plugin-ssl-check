@@ -2,6 +2,7 @@
 
 [Fluentd](https://fluentd.org/) input plugin to check ssl service.
 
+
 ## plugins
 
 ### in - ssl_check
@@ -41,6 +42,52 @@ Options are:
 * timestamp_format: iso, epochmillis timestamp format (iso)
 
 If no port is specified with host, default port is 443.
+
+
+## output examples
+
+### log output example
+
+``` json
+{
+    "timestamp": "2023-10-03T09:59:41.580+02:00",
+    "status": 1,
+    "host": "www.google.fr",
+    "port": 443,
+    "ssl_version": "TLSv1.2",
+    "ssl_dn": "/CN=*.google.fr",
+    "ssl_not_after": "2023-11-27T08:25:08.000Z",
+    "expire_in_days": 55,
+    "serial": "4e79dbb13c6b57b309780da2d1edbda4"
+}
+```
+
+### metric output example
+
+``` json
+{
+    "timestamp": "2023-10-03T10:06:21.417+02:00",
+    "metric_name": "ssl_status",
+    "metric_value": 1,
+    "host": "www.google.fr",
+    "port": 443,
+    "ssl_dn": "/CN=*.google.fr",
+    "ssl_version": "TLSv1.2",
+    "ssl_not_after": "2023-11-27T08:25:08.000Z",
+    "serial": "4e79dbb13c6b57b309780da2d1edbda4"
+}
+
+{
+    "timestamp": "2023-10-03T10:06:21.417+02:00",
+    "metric_name": "ssl_expirency",
+    "metric_value": 55,
+    "host": "www.google.fr",
+    "port": 443,
+    "ssl_dn": "/CN=*.google.fr",
+    "serial": "4e79dbb13c6b57b309780da2d1edbda4"
+}
+```
+
 
 ## Installation
 

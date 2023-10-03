@@ -134,7 +134,8 @@ module Fluent
           'ssl_version' => ssl_info.ssl_version,
           'ssl_dn' => ssl_info.subject_s,
           'ssl_not_after' => ssl_info.not_after,
-          'expire_in_days' => ssl_info.expire_in_days
+          'expire_in_days' => ssl_info.expire_in_days,
+          'serial' => ssl_info.serial
         }
         record.update('error_class' => ssl_info.error_class) if ssl_info.error_class
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
@@ -154,7 +155,8 @@ module Fluent
           "#{event_prefix}port" => ssl_info.port,
           "#{event_prefix}ssl_dn" => ssl_info.subject_s,
           "#{event_prefix}ssl_version" => ssl_info.ssl_version,
-          "#{event_prefix}ssl_not_after" => ssl_info.not_after
+          "#{event_prefix}ssl_not_after" => ssl_info.not_after,
+          "#{event_prefix}serial" => ssl_info.serial
         }
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
@@ -168,7 +170,8 @@ module Fluent
           'metric_value' => ssl_info.expire_in_days,
           "#{event_prefix}host" => ssl_info.host,
           "#{event_prefix}port" => ssl_info.port,
-          "#{event_prefix}ssl_dn" => ssl_info.subject_s
+          "#{event_prefix}ssl_dn" => ssl_info.subject_s,
+          "#{event_prefix}serial" => ssl_info.serial
         }
         router.emit(tag, Fluent::EventTime.from_time(ssl_info.time), record)
       end
@@ -217,6 +220,10 @@ module Fluent
           return unless cert
 
           cert.not_after.iso8601(3)
+        end
+
+        def serial
+          cert&.serial&.to_s(16)&.downcase
         end
 
         def status

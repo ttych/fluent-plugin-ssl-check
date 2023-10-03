@@ -159,6 +159,7 @@ class SslCheckInputTest < Test::Unit::TestCase
                      'port' => 1272,
                      'ssl_version' => nil,
                      'ssl_dn' => nil,
+                     'serial' => nil,
                      'ssl_not_after' => nil,
                      'expire_in_days' => nil,
                      'error_class' => 'Errno::ECONNREFUSED' },
@@ -182,6 +183,7 @@ class SslCheckInputTest < Test::Unit::TestCase
                      'port' => 443,
                      'ssl_version' => 'ssl_version_test',
                      'ssl_dn' => '/CN=TEST',
+                     'serial' => '0',
                      'ssl_not_after' => '2025-07-05T22:00:00.000Z',
                      'expire_in_days' => 730 },
                    events.first.last)
@@ -210,6 +212,7 @@ class SslCheckInputTest < Test::Unit::TestCase
                      'metric_name' => 'ssl_status',
                      'metric_value' => 0,
                      'ssl_dn' => nil,
+                     'serial' => nil,
                      'ssl_version' => nil,
                      'ssl_not_after' => nil }, events[0].last)
     end
@@ -238,6 +241,7 @@ class SslCheckInputTest < Test::Unit::TestCase
                      'metric_name' => 'ssl_status',
                      'metric_value' => 1,
                      'ssl_dn' => '/CN=TEST',
+                     'serial' => '0',
                      'ssl_version' => 'ssl_version_test',
                      'ssl_not_after' => '2025-07-05T22:00:00.000Z' }, events[0].last)
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events[1].first
@@ -246,7 +250,8 @@ class SslCheckInputTest < Test::Unit::TestCase
                      'timestamp' => 1_688_680_800_000,
                      'metric_name' => 'ssl_expirency',
                      'metric_value' => 730,
-                     'ssl_dn' => '/CN=TEST' }, events[1].last)
+                     'ssl_dn' => '/CN=TEST',
+                     'serial' => '0' }, events[1].last)
     end
   end
 
