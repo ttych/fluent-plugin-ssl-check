@@ -36,12 +36,45 @@ Options are:
 * cert: client cert for ssl connection
 * key: client key associated to client cert for ssl connection
 * timeout: timeout for ssl check execution (5sec)
+* paths: local certificate file paths
 * log_events: emit log format (true)
 * metric_events: emit metric format (false)
 * event_prefix: metric event prefix for extra dimension
 * timestamp_format: iso, epochmillis timestamp format (iso)
 
 If no port is specified with host, default port is 443.
+
+
+### in - ssl_file_check
+
+Poll ssl local file and report status.
+
+Example:
+
+``` conf
+<source>
+  @type ssl_file_check
+  tag ssl_check
+
+  paths /etc/cert/host.pem,/app/application_1/cert.pem
+
+  interval 600
+
+  ca_path /my/ca_dir/
+  ca_file /my/ca_file
+</source>
+```
+
+Options are:
+* tag: Tag to emit events on
+* interval: check every X seconds
+* paths: local certificate file paths
+* ca_path: directory that contains CA files
+* ca_file: specify a CA file directly
+* log_events: emit log format (true)
+* metric_events: emit metric format (false)
+* event_prefix: metric event prefix for extra dimension
+* timestamp_format: iso, epochmillis timestamp format (iso)
 
 
 ## output examples

@@ -5,10 +5,11 @@ require 'fluent/test'
 require 'fluent/test/driver/input'
 require 'fluent/test/helpers'
 
-require 'timecop'
-
 Test::Unit::TestCase.include(Fluent::Test::Helpers)
 Test::Unit::TestCase.extend(Fluent::Test::Helpers)
+
+require 'timecop'
+require 'mocha/test_unit'
 
 def test_data_path(filename)
   test_dir = File.expand_path(__dir__)

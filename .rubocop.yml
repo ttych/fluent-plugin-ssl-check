@@ -22,6 +22,7 @@ Metrics/ClassLength:
   Exclude:
     - test/**/*.rb
     - lib/fluent/plugin/in_ssl_check.rb
+    - lib/fluent/plugin/in_ssl_file_check.rb
 
 Metrics/MethodLength:
   Max: 20
@@ -29,3 +30,6 @@ Metrics/MethodLength:
 # Naming/MethodParameterName:
 #   Exclude:
 #     - lib/fluent/plugin/in_ssl_check.rb
+
+Style/Documentation:
+  Enabled: false

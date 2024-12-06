@@ -27,6 +27,7 @@ class SslCheckInputTest < Test::Unit::TestCase
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_LOG_EVENTS, input.log_events
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_METRIC_EVENTS, input.metric_events
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_EVENT_PREFIX, input.event_prefix
+      assert_equal Fluent::Plugin::SslFileCheckInput::DEFAULT_TIMESTAMP_FORMAT, input.timestamp_format
     end
 
     test 'tag can not be empty' do
@@ -153,10 +154,11 @@ class SslCheckInputTest < Test::Unit::TestCase
 
       assert_equal 1, events.size
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events.first.first
-      assert_equal({ 'timestamp' => '2023-07-07T00:00:00.000+02:00',
+      assert_equal({ 'timestamp' => '2023-07-07T00:00:00.000Z',
                      'status' => 0,
                      'host' => '127.0.0.2',
                      'port' => 1272,
+                     'path' => nil,
                      'ssl_version' => nil,
                      'ssl_dn' => nil,
                      'serial' => nil,
@@ -177,14 +179,15 @@ class SslCheckInputTest < Test::Unit::TestCase
 
       assert_equal 1, events.size
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events.first.first
-      assert_equal({ 'timestamp' => '2023-07-07T00:00:00.000+02:00',
+      assert_equal({ 'timestamp' => '2023-07-07T00:00:00.000Z',
                      'status' => 1,
                      'host' => 'localhost',
                      'port' => 443,
+                     'path' => nil,
                      'ssl_version' => 'ssl_version_test',
-                     'ssl_dn' => '/CN=TEST',
+                     'ssl_dn' => 'CN=TEST',
                      'serial' => '0',
-                     'ssl_not_after' => '2025-07-05T22:00:00.000Z',
+                     'ssl_not_after' => '2025-07-06T00:00:00.000Z',
                      'expire_in_days' => 730 },
                    events.first.last)
     end
@@ -208,7 +211,8 @@ class SslCheckInputTest < Test::Unit::TestCase
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events[0].first
       assert_equal({ 'host' => '127.0.0.2',
                      'port' => 1272,
-                     'timestamp' => 1_688_680_800_000,
+                     'path' => nil,
+                     'timestamp' => 1_688_688_000_000,
                      'metric_name' => 'ssl_status',
                      'metric_value' => 0,
                      'ssl_dn' => nil,
@@ -237,20 +241,22 @@ class SslCheckInputTest < Test::Unit::TestCase
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events[0].first
       assert_equal({ 'host' => 'localhost',
                      'port' => 443,
-                     'timestamp' => 1_688_680_800_000,
+                     'path' => nil,
+                     'timestamp' => 1_688_688_000_000,
                      'metric_name' => 'ssl_status',
                      'metric_value' => 1,
-                     'ssl_dn' => '/CN=TEST',
+                     'ssl_dn' => 'CN=TEST',
                      'serial' => '0',
                      'ssl_version' => 'ssl_version_test',
-                     'ssl_not_after' => '2025-07-05T22:00:00.000Z' }, events[0].last)
+                     'ssl_not_after' => '2025-07-06T00:00:00.000Z' }, events[0].last)
       assert_equal Fluent::Plugin::SslCheckInput::DEFAULT_TAG, events[1].first
       assert_equal({ 'host' => 'localhost',
                      'port' => 443,
-                     'timestamp' => 1_688_680_800_000,
+                     'path' => nil,
+                     'timestamp' => 1_688_688_000_000,
                      'metric_name' => 'ssl_expirency',
                      'metric_value' => 730,
-                     'ssl_dn' => '/CN=TEST',
+                     'ssl_dn' => 'CN=TEST',
                      'serial' => '0' }, events[1].last)
     end
   end
@@ -260,7 +266,7 @@ class SslCheckInputTest < Test::Unit::TestCase
   DEFAULT_CONF = %(
     hosts localhost
   )
-  MOCKED_TIME = Time.parse('2023-07-07')
+  MOCKED_TIME = Time.parse('2023-07-07T00:00:00.000Z')
   def create_driver(conf = DEFAULT_CONF)
     Fluent::Test::Driver::Input.new(Fluent::Plugin::SslCheckInput).configure(conf)
   end
@@ -268,11 +274,11 @@ class SslCheckInputTest < Test::Unit::TestCase
   def mock_driver_ssl_info(driver)
     driver.instance.define_singleton_method(:fetch_ssl_info) do |_host, _port|
       certificate = OpenSSL::X509::Certificate.new.tap do |cert|
-        cert.subject = OpenSSL::X509::Name.parse '/CN=TEST'
+        cert.subject = OpenSSL::X509::Name.parse 'CN=TEST'
         cert.not_after = MOCKED_TIME + (2 * 365 * 24 * 60 * 60)  # 2 years
       end
 
-      Fluent::Plugin::SslCheckInput::SslInfo.new(
+      Fluent::Plugin::SslCheck::SslInfo.new(
         host: 'localhost',
         port: 443,
         cert: certificate,
