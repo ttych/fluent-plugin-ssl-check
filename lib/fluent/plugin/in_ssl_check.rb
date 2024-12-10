@@ -32,7 +32,6 @@ module Fluent
       Fluent::Plugin.register_input(NAME, self)
 
       include Fluent::Plugin::SslCheck::SslInputEmit
-      include Fluent::Plugin::SslCheck::SslCommon
 
       DEFAULT_TAG = NAME
       DEFAULT_PORT = 443
@@ -104,7 +103,6 @@ module Fluent
         timer_execute(:ssl_check_timer, interval, repeat: true, &method(:check))
       end
 
-      # rubocop:disable Lint/SuppressedException
       def check
         hosts.each do |host_full|
           host, port = host_full.split(':')
@@ -112,10 +110,10 @@ module Fluent
           ssl_info = fetch_ssl_info(host, port)
           emit_logs(ssl_info) if log_events
           emit_metrics(ssl_info) if metric_events
-        rescue StandardError
+        rescue StandardError => e
+          log.warn "#{NAME}#check: #{e}"
         end
       end
-      # rubocop:enable Lint/SuppressedException
 
       def fetch_ssl_info(host, port)
         ssl_client = SslClient.new(
@@ -139,6 +137,8 @@ module Fluent
       # ssl client
       #  to check ssl status
       class SslClient
+        include Fluent::Plugin::SslCheck::SslCommon
+
         attr_reader :host, :port, :ca_path, :ca_file, :sni, :verify_mode, :cert, :key, :timeout
 
         # rubocop:disable Metrics/ParameterLists

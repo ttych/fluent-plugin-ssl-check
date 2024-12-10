@@ -84,16 +84,15 @@ module Fluent
         timer_execute(:ssl_file_check_timer, interval, repeat: true, &method(:check))
       end
 
-      # rubocop:disable Lint/SuppressedException
       def check
         paths.each do |cert_path|
           ssl_info = fetch_ssl_info(cert_path)
           emit_logs(ssl_info) if log_events
           emit_metrics(ssl_info) if metric_events
-        rescue StandardError
+        rescue StandardError => e
+          log.warn "#{NAME}#check: #{e}"
         end
       end
-      # rubocop:enable Lint/SuppressedException
 
       def fetch_ssl_info(filepath)
         ssl_file = Fluent::Plugin::SslCheck::FileChecker.new(filepath, ca_path: ca_path, ca_file: ca_file)
